@@ -1,48 +1,140 @@
-/**
- * The Sudoku number puzzle to be solved
- */
-public class Puzzle {
-    int[][] numbers = new int[SudokuConstants.GRID_SIZE][SudokuConstants.GRID_SIZE];
-    boolean[][] isGiven = new boolean[SudokuConstants.GRID_SIZE][SudokuConstants.GRID_SIZE];
+import java.util.Random;
 
-    public Puzzle() {
-        super();
+public class Puzzle {
+    public int[][] numbers = new int[SudokuConstants.GRID_SIZE][SudokuConstants.GRID_SIZE];
+    private Random random = new Random();
+
+    /**
+     * Generate a new puzzle with a given difficulty level.
+     * @param level Difficulty level (e.g., 1 for easy, 4 for hard)
+     */
+    public void newPuzzle(int level) {
+        // Clear the grid first
+        clearGrid();
+
+        // Generate a valid Sudoku solution
+        if (generateCompletePuzzle()) {
+            // Remove numbers based on difficulty level
+            int cellsToRemove = level * 10;
+            randomizeEmptyCells(cellsToRemove);
+        } else {
+            System.out.println("Failed to generate puzzle. Trying again with empty grid.");
+            newPuzzle(level); // Retry with fresh grid
+        }
     }
 
-    public void newPuzzle(int cellsToGuess) {
-        int[][] hardcodedNumbers = {
-                {5, 3, 4, 6, 7, 8, 9, 1, 2},
-                {6, 7, 2, 1, 9, 5, 3, 4, 8},
-                {1, 9, 8, 3, 4, 2, 5, 6, 7},
-                {8, 5, 9, 7, 6, 1, 4, 2, 3},
-                {4, 2, 6, 8, 5, 3, 7, 9, 1},
-                {7, 1, 3, 9, 2, 4, 8, 5, 6},
-                {9, 6, 1, 5, 3, 7, 2, 8, 4},
-                {2, 8, 7, 4, 1, 9, 6, 3, 5},
-                {3, 4, 5, 2, 8, 6, 1, 7, 9}
-        };
-
-        for (int row = 0; row < SudokuConstants.GRID_SIZE; ++row) {
-            for (int col = 0; col < SudokuConstants.GRID_SIZE; ++col) {
-                numbers[row][col] = hardcodedNumbers[row][col];
+    /**
+     * Clear the entire grid
+     */
+    private void clearGrid() {
+        for (int i = 0; i < SudokuConstants.GRID_SIZE; i++) {
+            for (int j = 0; j < SudokuConstants.GRID_SIZE; j++) {
+                numbers[i][j] = 0;
             }
         }
+    }
 
-        int clues = 0;
-        while (clues < 81 - cellsToGuess) {
-            int row = (int) (Math.random() * SudokuConstants.GRID_SIZE);
-            int col = (int) (Math.random() * SudokuConstants.GRID_SIZE);
-            if (!isGiven[row][col]) {
-                isGiven[row][col] = true;
-                clues++;
-            }
+    /**
+     * Generate a complete valid Sudoku solution.
+     * @return true if generation successful, false otherwise
+     */
+    private boolean generateCompletePuzzle() {
+        return fillGrid(0, 0);
+    }
+
+    /**
+     * Fill the grid using backtracking to ensure a valid Sudoku solution.
+     */
+    private boolean fillGrid(int row, int col) {
+        // If we've filled all rows, we're done
+        if (row == SudokuConstants.GRID_SIZE) {
+            return true;
         }
 
-        for (int row = 0; row < SudokuConstants.GRID_SIZE; ++row) {
-            for (int col = 0; col < SudokuConstants.GRID_SIZE; ++col) {
-                if (!isGiven[row][col]) {
-                    isGiven[row][col] = false;
+        // Move to next row when we reach end of current row
+        if (col == SudokuConstants.GRID_SIZE) {
+            return fillGrid(row + 1, 0);
+        }
+
+        // Skip if cell is already filled
+        if (numbers[row][col] != 0) {
+            return fillGrid(row, col + 1);
+        }
+
+        // Try numbers 1-9 in random order
+        int[] numbersToTry = getRandomOrderedNumbers();
+
+        for (int num : numbersToTry) {
+            if (isValidPlacement(row, col, num)) {
+                numbers[row][col] = num;
+                if (fillGrid(row, col + 1)) {
+                    return true;
                 }
+                numbers[row][col] = 0; // Backtrack
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Generate array of numbers 1-9 in random order
+     */
+    private int[] getRandomOrderedNumbers() {
+        int[] nums = new int[9];
+        for (int i = 0; i < 9; i++) {
+            nums[i] = i + 1;
+        }
+
+        // Fisher-Yates shuffle
+        for (int i = nums.length - 1; i > 0; i--) {
+            int j = random.nextInt(i + 1);
+            int temp = nums[i];
+            nums[i] = nums[j];
+            nums[j] = temp;
+        }
+        return nums;
+    }
+
+    /**
+     * Check if placing a number is valid according to Sudoku rules.
+     */
+    private boolean isValidPlacement(int row, int col, int num) {
+        // Check row
+        for (int j = 0; j < SudokuConstants.GRID_SIZE; j++) {
+            if (numbers[row][j] == num) return false;
+        }
+
+        // Check column
+        for (int i = 0; i < SudokuConstants.GRID_SIZE; i++) {
+            if (numbers[i][col] == num) return false;
+        }
+
+        // Check 3x3 box
+        int boxRow = row - (row % SudokuConstants.SUBGRID_SIZE);
+        int boxCol = col - (col % SudokuConstants.SUBGRID_SIZE);
+
+        for (int i = boxRow; i < boxRow + SudokuConstants.SUBGRID_SIZE; i++) {
+            for (int j = boxCol; j < boxCol + SudokuConstants.SUBGRID_SIZE; j++) {
+                if (numbers[i][j] == num) return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * Randomly remove numbers to create empty cells based on difficulty level.
+     * @param emptyCells Number of cells to empty.
+     */
+    private void randomizeEmptyCells(int emptyCells) {
+        while (emptyCells > 0) {
+            int row = random.nextInt(SudokuConstants.GRID_SIZE);
+            int col = random.nextInt(SudokuConstants.GRID_SIZE);
+
+            if (numbers[row][col] != 0) {
+                numbers[row][col] = 0;
+                emptyCells--;
             }
         }
     }
